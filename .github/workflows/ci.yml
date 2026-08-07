@@ -59,7 +59,7 @@ jobs:
             g++ clang make cmake ca-certificates git
           g++ --version | head -1
           clang++ --version | head -1
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: ci/run.sh
         run: ci/run.sh
 
