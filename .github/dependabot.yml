@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # GitHub Actions used in .github/workflows/ -- the only ecosystem here.
+  #
+  # testrixa is header-only C++ with no package manager and no third-party
+  # dependencies, so there is nothing else for Dependabot to watch. That is a
+  # property of the project, not an omission: if a dependency ever appears, it
+  # needs an entry here and a line in the README, which currently promises none.
+  #
+  # Grouped into a single PR. Ungrouped, one PR per action saturates
+  # open-pull-requests-limit and later updates silently stop opening.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"

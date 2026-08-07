@@ -1,0 +1,86 @@
+# testrixa CI
+#
+# One job that runs ci/run.sh -- the same script `make ci` runs locally. A
+# workflow that inlines its own steps drifts from what people run by hand, and
+# then "works on my machine" becomes a real answer. There is nothing here to
+# drift.
+#
+# It is not split into a per-compiler matrix on purpose. ci/run.sh takes the
+# compilers as arguments, but its sanitizer and consumer sections are not
+# per-compiler -- running it twice would repeat those for no extra information,
+# and the script already labels which compiler each section belongs to. Failure
+# attribution comes from its output, not from the job name.
+#
+# Why a debian:bookworm-slim container instead of the ubuntu-latest runner:
+# bookworm is gcc 12 and clang 14, which is exactly the support matrix the
+# README claims. ubuntu-latest carries newer compilers and moves when GitHub
+# moves it -- CI would then be testing something other than what the
+# documentation promises, and neither would be wrong out loud. The packages are
+# the same four as ci/Dockerfile, plus git for actions/checkout.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "include/**"
+      - "tests/**"
+      - "examples/**"
+      - "cmake/**"
+      - "ci/**"
+      - "CMakeLists.txt"
+      - "Makefile"
+      - ".github/workflows/ci.yml"
+  # No paths filter on pull_request, deliberately. A filtered PR trigger skips
+  # the whole workflow on a docs-only PR, which leaves the required check stuck
+  # at "Expected -- waiting for status" and blocks the merge for anyone who is
+  # not an admin. push is safe to filter: it runs after the merge, so it is not
+  # a gate.
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    container: debian:bookworm-slim
+    steps:
+      - name: toolchain
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            g++ clang make cmake ca-certificates git
+          g++ --version | head -1
+          clang++ --version | head -1
+      - uses: actions/checkout@v4
+      - name: ci/run.sh
+        run: ci/run.sh
+
+  # One always-run job to mark as the required status check. It reports even
+  # when `verify` is skipped, so the check never gets stuck, and it fails only
+  # when a job actually failed or was cancelled -- `if: always()` on its own
+  # would pass straight through an upstream failure. Keeping the required check
+  # on this name means the jobs above can be restructured without touching
+  # branch protection.
+  ci-complete:
+    if: always()
+    needs: [verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate on upstream results
+        run: |
+          echo "verify=${{ needs.verify.result }}"
+          case "${{ needs.verify.result }}" in
+            failure|cancelled)
+              echo "a required job did not pass"
+              exit 1
+              ;;
+          esac
+          echo "all required jobs passed or were skipped"

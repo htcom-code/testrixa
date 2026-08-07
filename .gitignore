@@ -1,0 +1,10 @@
+*.swp
+.DS_Store
+*.out
+*.o
+
+# debug symbol bundles left by clang -g on macOS (sanitizer builds)
+*.dSYM/
+
+# build directories
+build/

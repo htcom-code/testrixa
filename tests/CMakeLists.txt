@@ -1,0 +1,46 @@
+# testrixa's own test suite.
+
+add_executable(testrixa_tests
+    testMain.cpp
+    testTEST.cpp
+    testOptions.cpp
+    testMemory.cpp
+    testLeak.cpp
+    testCompare.cpp
+    testShim.cpp
+    testQuarantine.cpp
+    testReporter.cpp
+    testBacktrace.cpp
+    testFixture.cpp
+    testStress.cpp
+    testThread.cpp
+    testMock.cpp)
+
+find_package(Threads REQUIRED)
+target_link_libraries(testrixa_tests PRIVATE testrixa::testrixa Threads::Threads)
+target_compile_definitions(testrixa_tests PRIVATE TEST_TERM)
+target_compile_options(testrixa_tests PRIVATE ${TESTRIXA_WARNINGS})
+
+add_test(NAME testrixa_self_test COMMAND testrixa_tests)
+
+# Pins the terminal runner's command line. The prototype's parser shipped with
+# no tests, so this is the only thing the option registry can be checked against.
+add_test(NAME testrixa_cli_test
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/cli_test.sh $<TARGET_FILE:testrixa_tests>)
+
+# Contract check for the macro naming scheme: compiled, never linked, so it
+# cannot add a test case to the runner's output. Building it IS the assertion --
+# checkPrefix.cpp fails with #error if the short aliases survive
+# TESTRIXA_NO_SHORT_MACROS.
+add_library(testrixa_check_prefix OBJECT checkPrefix.cpp)
+target_link_libraries(testrixa_check_prefix PRIVATE testrixa::testrixa)
+target_compile_definitions(testrixa_check_prefix PRIVATE TEST_TERM)
+target_compile_options(testrixa_check_prefix PRIVATE ${TESTRIXA_WARNINGS})
+
+# Including testrixa must not drop anything into the consumer's global
+# namespace -- core.hpp used to carry a global `using namespace std;`, so a
+# consumer with their own `string` or `count` failed to compile.
+add_library(testrixa_check_namespace OBJECT checkNamespace.cpp)
+target_link_libraries(testrixa_check_namespace PRIVATE testrixa::testrixa)
+target_compile_definitions(testrixa_check_namespace PRIVATE TEST_TERM)
+target_compile_options(testrixa_check_namespace PRIVATE ${TESTRIXA_WARNINGS})

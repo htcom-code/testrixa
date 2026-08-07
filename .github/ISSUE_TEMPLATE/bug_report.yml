@@ -1,0 +1,125 @@
+name: Bug report
+description: testrixa misbehaves — a wrong result, a check that fires when it should not (or stays silent when it should fire), a crash, or a build failure.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **testrixa** is a header-only C++17 testing
+        platform: unit tests, benchmarks, memory and leak checking, stress,
+        concurrency, mocks, fixtures and reporting.
+
+        Two kinds of report are especially valuable, because they are the ones
+        the project cannot find by itself:
+
+        - **A check that stays silent.** If a leak, an overflow, a double free
+          or a mock call was not reported when it should have been, that is
+          worse than a false alarm — the suite looks green either way.
+        - **A consumer-side break.** Something that compiles here and fails in
+          your build: a name we leaked into your global namespace, a macro
+          collision, a warning under your flags, a broken `find_package`.
+
+        **Probably not a testrixa bug:** a race that ThreadSanitizer reports in
+        your own code (`<testrixa/thread.h>` is a harness, not a detector), or
+        C `malloc` going untracked in a translation unit that does not include
+        `<testrixa/malloc_shim.h>`. Both are documented behaviour — see
+        "What it does not do" in the README.
+
+        **Security issues:** do **not** file here — see [SECURITY.md](../blob/main/SECURITY.md).
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Minimal reproducer
+      description: The smallest test case that shows it. A single self-contained .cpp we can compile is ideal.
+      render: cpp
+      placeholder: |
+        #define TEST_RUN_TERM
+        #include <testrixa/testrixa.h>
+
+        TESTCASE_BEGIN(repro)
+        TESTCASE_BASIC(repro) {
+            TESTCASE_GROUP_START(g) {
+                // ...
+            } TESTCASE_GROUP_END(g)
+            TESTCASE_RETURN
+        }
+        TESTCASE_MEASURE(repro) { TESTCASE_RETURN }
+        TESTCASE_END(repro)
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What you expected testrixa to do or report.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead — the console table, the compiler diagnostic, or the crash. Paste it verbatim rather than summarising.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: testrixa version / commit
+      description: Release tag or commit SHA.
+      placeholder: "v0.1.0 or abc1234"
+    validations:
+      required: true
+  - type: input
+    id: compiler
+    attributes:
+      label: Compiler and standard
+      description: Compiler and version, the -std= you build with, and your warning flags. Many reports come down to a flag we do not use ourselves.
+      placeholder: "g++ 12.2, -std=c++17 -Wall -Wextra -Wpedantic"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and architecture
+      description: Windows is untested — MSVC and Win32 code paths exist in the headers and have never been compiled. Reports are welcome, but expect them to be findings rather than regressions.
+      placeholder: "Debian 12 x86_64 / macOS 15 arm64 / Windows 11 MSVC 19.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part
+      multiple: true
+      options:
+        - Unit test / assertions
+        - Benchmark (measure phase)
+        - Memory and leak checking
+        - Mock
+        - Stress (repetition)
+        - Thread harness
+        - Fixture (setUp / tearDown)
+        - Reporter (console table, JUnit XML)
+        - Runner (CLI, phase selection, options)
+        - Build / install (make, CMake, find_package)
+        - Not sure
+    validations:
+      required: false
+  - type: textarea
+    id: config
+    attributes:
+      label: Command line and build setup
+      description: >-
+        The flags you ran it with (`--mem.preset`, `--stress.scale`, `--only`,
+        …), whether a sanitizer was on, and how testrixa is included (copied
+        headers, make install, find_package, add_subdirectory). Memory-suite
+        behaviour in particular depends on the preset.
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Anything that narrowed it down — a compiler that does not reproduce it, an optimisation level that does, a version that used to work.
+    validations:
+      required: false
