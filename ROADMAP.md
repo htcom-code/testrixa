@@ -82,15 +82,30 @@ it is rarely worse than selecting part of it.
 gcc 12 and clang 14 on Linux and macOS, `-Wall -Wextra -Werror` clean, verified
 under AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer.
 
-### 🛠 Planned — Windows / MSVC
+### ✅ Shipped — Windows / MSVC
 
-MSVC and Win32 code paths exist in the headers — `traits.h` detects the
-compiler, `platform.hpp` has `_aligned_malloc` and `dbghelp` branches — and
-**none of it has ever been compiled**. Calling that "support" would be a claim
-the project cannot back, so the README says it is untested instead.
+Builds and passes under MSVC 19.51 on Windows Server 2025, through CMake, with
+`/W4 /WX`. A CI job gates it like the others.
 
-What it needs: a Windows CI job, then whatever that job finds. Experience from
-the Linux/macOS split suggests the first run is a discovery, not a formality.
+The first run was a discovery, not a formality: fourteen defects came out, and
+only two were Windows-specific. The rest were ordinary bugs — silent narrowing,
+name shadowing, a `bool` compared against an `unsigned` — that gcc 12, gcc 15,
+gcc 16, clang 14 and clang 21 had all walked past. A fifth compiler earns its
+place the same way the second one did.
+
+Still missing there, and worth knowing before relying on it:
+
+- **No sanitizers.** ASan/UBSan/TSan run on Linux only.
+- **No `make`.** `ci/run.sh` and the GNU Makefile are POSIX shell; CMake is the
+  only build path on Windows.
+- **Backtraces are addresses without symbols.** Nothing calls `SymFromAddr`.
+
+### 🔎 Candidate — Windows backtrace symbolisation
+
+`CaptureStackBackTrace` gives addresses; turning them into names needs dbghelp
+and `SymFromAddr`. Worth doing, but it is the difference between a leak report
+that says `0x7ff6...` and one that names your function — not between working
+and not working.
 
 ### 🔎 Candidate — Older standards
 

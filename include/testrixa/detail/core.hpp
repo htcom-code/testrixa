@@ -15,7 +15,7 @@
 #include <vector>
 #include <fstream>
 #include <list>
-#include <math.h>
+#include <cmath>
 #include <string>
 #include <type_traits>
 #include <iostream>
@@ -226,25 +226,31 @@ constexpr bool is_string_comp_v =
 
         template<typename ...Args>
         TestString& appendFormat(const std::string &fmt, Args ... args) {
-            int size_s = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
-            if (size_s > 0) {
-                auto size = static_cast<size_t>( size_s );
-                std::unique_ptr<char[]> buf( new char[ size ] );
-                std::snprintf( buf.get(), size, fmt.c_str(), args ... );
-                m_chars.append(std::string( buf.get(), buf.get() + size - 1 ));
+            const int measured = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
+            if (measured > 0) {
+                const std::size_t needed = static_cast<std::size_t>( measured );
+                std::unique_ptr<char[]> buf( new char[ needed ] );
+                std::snprintf( buf.get(), needed, fmt.c_str(), args ... );
+                m_chars.append(std::string( buf.get(), buf.get() + needed - 1 ));
             }
             return *this;
         }
         
+        // The local is `needed`, not `size`. A consumer is entitled to a global
+        // named `size` -- checkNamespace.cpp declares one for exactly that
+        // reason -- and MSVC /W4 reports a local that hides it (C4459). Under
+        // /WX that is their build broken by our header, so public headers here
+        // avoid names a consumer plausibly has at namespace scope. The contract
+        // check is what tells us when a new one appears.
         template<typename ...Args>
         TestString& format(const std::string &fmt, Args ... args) {
-            int size_s = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
-            if (size_s > 0) {
-                auto size = static_cast<size_t>( size_s );
-                std::unique_ptr<char[]> buf( new char[ size ] );
-                std::snprintf( buf.get(), size, fmt.c_str(), args ... );
+            const int measured = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
+            if (measured > 0) {
+                const std::size_t needed = static_cast<std::size_t>( measured );
+                std::unique_ptr<char[]> buf( new char[ needed ] );
+                std::snprintf( buf.get(), needed, fmt.c_str(), args ... );
                 m_chars.clear();
-                m_chars.append(std::string( buf.get(), buf.get() + size - 1 ));
+                m_chars.append(std::string( buf.get(), buf.get() + needed - 1 ));
             }
             return *this;
         }
@@ -321,7 +327,17 @@ constexpr bool is_string_comp_v =
     // C++17 and cmp_equal arrived in C++20.
     template <typename A, typename B>
     constexpr bool equalValues(A a, B b) {
-        if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
+        // bool against an integer promotes to 0/1 before comparing. That is
+        // what `==` already does; MSVC /W4 asks for it in writing (C4805).
+        // Semantics are unchanged -- true == 2 stays false -- and routing it
+        // back through this function lets the signedness rules below apply.
+        if constexpr (std::is_same_v<std::remove_cv_t<A>, bool>
+                      && !std::is_same_v<std::remove_cv_t<B>, bool>) {
+            return equalValues(static_cast<int>(a), b);
+        } else if constexpr (!std::is_same_v<std::remove_cv_t<A>, bool>
+                             && std::is_same_v<std::remove_cv_t<B>, bool>) {
+            return equalValues(a, static_cast<int>(b));
+        } else if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
                       && std::is_signed_v<A> != std::is_signed_v<B>) {
             if constexpr (std::is_signed_v<A>) {
                 // a negative signed value can never equal an unsigned one
@@ -389,6 +405,11 @@ constexpr bool is_string_comp_v =
 
         MemoryTally m_memory;
     public:
+        // The root and scratch groups have no depth. Passing -1 to an unsigned
+        // parameter said that by accident and made MSVC /W4 rightly complain;
+        // naming the value says it on purpose.
+        static const unsigned DEPTH_NONE = (unsigned)-1;
+
         GroupInfo(const std::string &name, unsigned depth, TEST_STATUS_TYPE type=TST_NONE)
         :m_name(name), m_total(0), m_success(0), m_fail(0), m_measure(0), m_depth(depth), m_type(type) {}
         
@@ -638,7 +659,7 @@ constexpr bool is_string_comp_v =
             setinit();
             // ms µs ns
             if (nano > 0) {
-                m_hours   =  nano/(60UL*60UL*1000UL*1000UL*1000UL);
+                m_hours   =  (unsigned short)(nano/(60UL*60UL*1000UL*1000UL*1000UL));
                 m_minutes = (nano/(60UL*1000UL*1000UL*1000UL))%60UL;
                 m_seconds = (nano/(1000UL*1000UL*1000UL))%60UL;
                 m_millis  = (nano/(1000UL*1000UL))%1000UL;
@@ -650,7 +671,7 @@ constexpr bool is_string_comp_v =
         void setMicro(uint64_t micro) {
             setinit();
             if (micro > 0) {
-                m_hours   = micro/(60UL*60UL*1000UL*1000UL);
+                m_hours   = (unsigned short)(micro/(60UL*60UL*1000UL*1000UL));
                 m_minutes = (micro/(60UL*1000UL*1000UL))%60UL;
                 m_seconds = (micro/(1000UL*1000UL))%60UL;
                 m_millis  = (micro/1000UL)%1000UL;
@@ -661,7 +682,7 @@ constexpr bool is_string_comp_v =
         void setMill(uint64_t mill) {
             setinit();
             if (mill >0) {
-                m_hours   = mill/(60UL*60UL*1000UL);
+                m_hours   = (unsigned short)(mill/(60UL*60UL*1000UL));
                 m_minutes = (mill/(60UL*1000UL))%60UL;
                 m_seconds = (mill/1000UL)%60UL;
                 m_millis  = mill%1000UL;
@@ -671,7 +692,7 @@ constexpr bool is_string_comp_v =
         void setSecond(uint64_t sec) {
             setinit();
             if (sec >0) {
-                m_hours   = sec/(60UL*60UL);
+                m_hours   = (unsigned short)(sec/(60UL*60UL));
                 m_minutes = (sec/60UL)%60UL;
                 m_seconds = sec%60;
             }
@@ -874,7 +895,7 @@ constexpr bool is_string_comp_v =
         unsigned m_loop;
 
         TEST()
-        :m_status(TST_NONE), m_root("ROOT", -1), m_temp("", -1), m_next(nullptr), m_loop(TRX_DEFAULT_LOOP_COUNT) {
+        :m_status(TST_NONE), m_root("ROOT", GroupInfo::DEPTH_NONE), m_temp("", GroupInfo::DEPTH_NONE), m_next(nullptr), m_loop(TRX_DEFAULT_LOOP_COUNT) {
             m_next = list;
             list = this;
         }
@@ -1369,7 +1390,7 @@ constexpr bool is_string_comp_v =
             m_loop    = loop;
             int ret = 1;
 
-            if ( (TestCaseSelect.empty() == false && strcasecmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
+            if ( (TestCaseSelect.empty() == false && strCaseCmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
                 // basic test start.
                 if (run_baisc) {
                     m_status = TST_BASIC;
@@ -1507,7 +1528,7 @@ constexpr bool is_string_comp_v =
         }
 
         int run_check() {
-            if ( (TestCaseSelect.empty() == false && strcasecmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
+            if ( (TestCaseSelect.empty() == false && strCaseCmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
                 return 1;
             }
             return 0;
@@ -1773,7 +1794,7 @@ constexpr bool is_string_comp_v =
             uint64_t nano=m_nano;
             bool detail = TEST::testShowDetail();
 
-            if (m_nano >0) { nano = round((m_nano*1.0) / m_loop);}
+            if (m_nano >0) { nano = (uint64_t)std::llround((double)m_nano / m_loop); }
 
             TimeResults m_times;
             m_times.setNano(nano);
@@ -1812,15 +1833,19 @@ constexpr bool is_string_comp_v =
                 m_times.setNano(m_max);
                 ss << "|" << TRX_CYAN_BOLD_COLOR << m_times << TRX_RESET_COLOR;
             } else {
-                std::string fname(filename());
-                if (fname.length() > TRX_LOG_TIME_SOURCE) {
-                    fname = fname.substr(0, TRX_LOG_TIME_SOURCE - 3).append("...");
+                // Not `fname` again: that name already holds the description
+                // above, and MSVC /W4 rejects the shadowing (C4456). Two
+                // different things under one name in one function is worth
+                // renaming regardless of who complains.
+                std::string source(filename());
+                if (source.length() > TRX_LOG_TIME_SOURCE) {
+                    source = source.substr(0, TRX_LOG_TIME_SOURCE - 3).append("...");
                 }
                 
                 // file name
                 ss << std::setfill(' ');
                 ss << "|" << TRX_CYAN_BOLD_COLOR;
-                ss << std::setw(TRX_LOG_TIME_SOURCE) << fname << TRX_RESET_COLOR;
+                ss << std::setw(TRX_LOG_TIME_SOURCE) << source << TRX_RESET_COLOR;
                 
                 // line nomber
                 ss << "|" << TRX_CYAN_BOLD_COLOR;
@@ -2224,12 +2249,12 @@ inline void ArgumentError(const std::string& message) {
 // Turns "basic,measure" into a mask. Returns false on an unknown name.
 inline bool ParsePhases(const std::string& text, unsigned& mask, std::string& unknown) {
     mask = 0;
-    std::string::size_type begin = 0;
-    while (begin <= text.size()) {
-        const std::string::size_type comma = text.find(',', begin);
+    std::string::size_type from = 0;
+    while (from <= text.size()) {
+        const std::string::size_type comma = text.find(',', from);
         const std::string name = (comma == std::string::npos)
-                               ? text.substr(begin)
-                               : text.substr(begin, comma - begin);
+                               ? text.substr(from)
+                               : text.substr(from, comma - from);
         if (name == "basic")        mask |= PHASE_BASIC;
         else if (name == "measure") mask |= PHASE_MEASURE;
         else if (name == "memory")  mask |= PHASE_MEMORY;
@@ -2237,7 +2262,7 @@ inline bool ParsePhases(const std::string& text, unsigned& mask, std::string& un
         else if (!name.empty())   { unknown = name; return false; }
 
         if (comma == std::string::npos) break;
-        begin = comma + 1;
+        from = comma + 1;
     }
     return true;
 }
@@ -2252,7 +2277,7 @@ void Listup(std::string &pname) {
 int main(int argc, char* argv[]) {
     bool stop = true;
     bool help = false;
-    bool list = false;
+    bool wantList = false;
     bool b_basic_only = false;
     bool b_time_only = false;
     unsigned phases = PHASE_DEFAULT;
@@ -2301,7 +2326,7 @@ int main(int argc, char* argv[]) {
         }
         if (arg == "--mem")                    { phases = PHASE_MEMORY; continue; }
         if (arg == "--stress")                 { phases = PHASE_STRESS; continue; }
-        if (arg == "-l" || arg == "--list")    { list = true;  continue; }
+        if (arg == "-l" || arg == "--list")    { wantList = true;  continue; }
         if (arg == "-h" || arg == "--help")    { help = true;  continue; }
         if (arg == "-s" || arg == "--no_stop") { stop = false; continue; }
         if (arg == "-d" || arg == "--detail")  { TEST::setTestShowDetail(true); continue; }
@@ -2357,9 +2382,12 @@ int main(int argc, char* argv[]) {
             }
 
             if (isLoopOption) {
-                char* end = nullptr;
-                const long parsed = std::strtol(digits.c_str(), &end, 10);
-                if (digits.empty() || (end && *end != '\0')) {
+                // `tail`, not `stop`: this function already has a `stop`
+                // holding the fail-stop flag, and MSVC /W4 reports the second
+                // one hiding the first (C4456).
+                char* tail = nullptr;
+                const long parsed = std::strtol(digits.c_str(), &tail, 10);
+                if (digits.empty() || (tail && *tail != '\0')) {
                     ArgumentError(arg + ": expected an integer, e.g. -t=30");
                     return 1;
                 }
@@ -2384,7 +2412,7 @@ int main(int argc, char* argv[]) {
         command = arg;
     }
 
-    if (list) {
+    if (wantList) {
         Listup(pname);
         return 0;
     }

@@ -8,6 +8,12 @@
 #ifndef TESTRIXA_TRAITS_H
 #define TESTRIXA_TRAITS_H
 
+#include <cstring>      // strrchr -- the __FILE_NAME__ fallback below uses it
+#if defined(_MSC_VER)
+#   include <string.h>   // _stricmp
+#else
+#   include <strings.h>  // strcasecmp -- POSIX puts it here, not in <cstring>
+#endif
 #include <string>
 
 //__has_include c++17 higher
@@ -111,11 +117,26 @@
      __FILE__           : full path filename
      __LINE__           : line number
 */
+//
+// gcc and clang provide __FILE_NAME__ as a built-in, so the fallback below is
+// dead code there -- and was therefore never compiled until Windows was tried.
+// It needs <cstring> for strrchr, which this header now includes.
+//
+// MSVC paths can carry either separator: a path written into the project file
+// with '/' survives into __FILE__ even though the platform separator is '\'.
+// Checking only one of them leaves the full path in the report, so the MSVC
+// branch takes whichever appears last.
+//
 #if !defined(__FILE_NAME__)
 #   if defined(_MSC_VER)
-#       define __FILE_NAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+#       define TRX_FILE_NAME_SEP_(p) \
+            (std::strrchr(p, '\\') > std::strrchr(p, '/') \
+                ? std::strrchr(p, '\\') : std::strrchr(p, '/'))
+#       define __FILE_NAME__ \
+            (TRX_FILE_NAME_SEP_(__FILE__) ? TRX_FILE_NAME_SEP_(__FILE__) + 1 : __FILE__)
 #   else
-#       define __FILE_NAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#       define __FILE_NAME__ \
+            (std::strrchr(__FILE__, '/') ? std::strrchr(__FILE__, '/') + 1 : __FILE__)
 #   endif
 #endif
 
@@ -155,10 +176,13 @@
 #   define TRX_OS_CYGWIN 1
 #elif defined(_WIN32)
 #   define TRX_OS_WINDOWS 1
-#   ifndef NOMINMAX
-#       define NOMINMAX
+    // <winapifamily.h>, not <windows.h>. All that is wanted here is the
+    // desktop/UWP split, and <windows.h> drags in rpcndr.h -- which typedefs
+    // `byte` at global scope and breaks any consumer who declared their own.
+    // checkNamespace.cpp caught exactly that on the first MSVC build.
+#   if __has_include(<winapifamily.h>)
+#       include <winapifamily.h>
 #   endif
-#   include <windows.h>
 #   if defined(WINAPI_FAMILY_PARTITION)
 #       if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
 #           define TRX_OS_WINDOWS_WIN32 1
@@ -220,6 +244,18 @@
 
 
 TRX_BEGIN_NAMESPACE
+
+// Case-insensitive comparison. POSIX spells it strcasecmp and declares it in
+// <strings.h>; MSVC spells it _stricmp and has never had the other. Both are C
+// library calls rather than locale-aware comparisons, which is what the
+// test-case name lookup wants.
+inline int strCaseCmp(const char* left, const char* right) {
+#if defined(_MSC_VER)
+    return ::_stricmp(left, right);
+#else
+    return ::strcasecmp(left, right);
+#endif
+}
 
 template <typename T> std::string type_name() {
     using TR = typename std::remove_reference<T>::type;

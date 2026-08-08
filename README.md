@@ -388,9 +388,10 @@ The honest list, and the reason in each case.
   and never inside prebuilt libraries. The report says so every time it prints.
 - **Tests run in one thread, one after another.** The whole suite here runs in
   under a second; parallel execution would be pure complexity.
-- **Windows is untested.** MSVC and Win32 code paths exist in the headers and
-  have never been compiled, let alone run. Treat them as a starting point, not
-  as support.
+- **Windows has no sanitizers and no `make` here.** The suite builds and passes
+  under MSVC through CMake, but `ci/run.sh` — the sanitizers, the consumer
+  checks, the GNU Makefile — is a POSIX shell script and does not run there.
+  Backtraces are addresses without symbols: nothing calls `SymFromAddr` yet.
 
 ## Requirements
 
@@ -398,13 +399,14 @@ C++17. No dependencies beyond the standard library.
 
 | | Tested |
 |---|---|
-| Compilers | gcc 12, clang 14 — `-Wall -Wextra -Werror` clean |
-| Platforms | Linux (Debian bookworm), macOS |
-| Sanitizers | ASan, UBSan, TSan |
-| Windows / MSVC | **not tested** — see above |
+| Compilers | gcc 12, clang 14, MSVC 19.51 — warning-free at `-Wall -Wextra -Werror` / `/W4 /WX` |
+| Platforms | Linux (Debian bookworm), macOS, Windows Server 2025 |
+| Sanitizers | ASan, UBSan, TSan — Linux only |
+| Build paths | make and CMake on Linux/macOS; **CMake only on Windows** |
 
-Leak backtraces need `<execinfo.h>` (glibc, macOS). Without it, tracking and
-leak detection still work; only the captured stacks are missing.
+Leak backtraces need `<execinfo.h>` (glibc, macOS). Without it — musl, and
+Windows — tracking and leak detection still work; only the captured stacks are
+missing, and the leak report says so.
 
 ## Building testrixa itself
 

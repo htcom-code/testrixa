@@ -24,8 +24,41 @@
 #include <cstdio>
 
 #if defined(_MSC_VER)
+    // <windows.h> is a public-header include, so it has to be tamed before it
+    // reaches a consumer:
+    //
+    //   NOMINMAX             it defines min/max as macros, which break
+    //                        std::min/std::max and anything with a member of
+    //                        that name -- in the consumer's code, not ours.
+    //   WIN32_LEAN_AND_MEAN  drops Winsock, OLE, RPC and the rest. The only
+    //                        thing wanted from here is
+    //                        CaptureStackBackTrace.
+    //
+    // Both are defined only if the consumer has not already made their own
+    // choice, and neither is left defined afterwards -- undefining a macro the
+    // consumer set would be the same class of pollution.
+#   ifndef NOMINMAX
+#       define NOMINMAX
+#       define TRX_DEFINED_NOMINMAX
+#   endif
+#   ifndef WIN32_LEAN_AND_MEAN
+#       define WIN32_LEAN_AND_MEAN
+#       define TRX_DEFINED_LEAN_AND_MEAN
+#   endif
 #   include <windows.h>
-#   include <dbghelp.h>
+    // No <dbghelp.h>: nothing here symbolises a frame. describeFrame has no
+    // MSVC branch, so a Windows backtrace is addresses and nothing else --
+    // the same shape as a stripped binary elsewhere. Adding SymFromAddr is a
+    // separate piece of work; carrying the header and its link for a call that
+    // does not exist is not.
+#   ifdef TRX_DEFINED_NOMINMAX
+#       undef NOMINMAX
+#       undef TRX_DEFINED_NOMINMAX
+#   endif
+#   ifdef TRX_DEFINED_LEAN_AND_MEAN
+#       undef WIN32_LEAN_AND_MEAN
+#       undef TRX_DEFINED_LEAN_AND_MEAN
+#   endif
 #elif defined(__has_include)
 #   if __has_include(<execinfo.h>)
 #       include <execinfo.h>
@@ -141,10 +174,10 @@ inline int captureBacktrace(void** frames, int maximum, int skip) {
     const int got = ::backtrace(raw, limit);
     if (got <= skip) return 0;
 
-    int count = got - skip;
-    if (count > maximum) count = maximum;
-    std::memcpy(frames, raw + skip, (std::size_t)count * sizeof(void*));
-    return count;
+    int kept = got - skip;
+    if (kept > maximum) kept = maximum;
+    std::memcpy(frames, raw + skip, (std::size_t)kept * sizeof(void*));
+    return kept;
 #elif defined(_MSC_VER)
     return (int)CaptureStackBackTrace((ULONG)skip, (ULONG)maximum, frames, nullptr);
 #else

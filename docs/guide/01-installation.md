@@ -21,13 +21,12 @@ A C++17 compiler and, for two of the five methods, `make` or CMake.
 | **Fedora / RHEL** | `sudo dnf install gcc-c++ make cmake` | ✅ run |
 | **Alpine** | `apk add g++ make cmake` | ✅ run |
 | **Arch** | `sudo pacman -S gcc make cmake` | not run |
-| **Windows** | Visual Studio with the "Desktop development with C++" workload, **or** MSYS2/MinGW-w64, **or** WSL and then follow the Linux row. | not run |
+| **Windows** | Visual Studio with the "Desktop development with C++" workload (MSVC + CMake). MinGW-w64 and WSL also work; WSL then follows the Linux row. | ✅ run (MSVC) |
 
 ✅ means the command was executed on that system and the resulting toolchain
-built and ran the whole suite. The other two are from each project's
-documentation and are untested here — the Arch one because the container image
-available for testing could not install them, and Windows because
-[nothing has ever been built there](#windows).
+built and ran the whole suite. Only the Arch row is untested — the container
+image available for testing could not install those packages. The Windows row
+covers MSVC through CMake; MinGW-w64 has not been tried.
 
 Check what you have:
 
@@ -47,6 +46,7 @@ These were built and run in full, not inferred from a support matrix:
 | Debian 12 (bookworm) | gcc 12, clang 14 | full suite, CMake, ASan/UBSan/TSan, both consumer paths |
 | Fedora 43 | gcc 16 | full suite |
 | Alpine (musl) | gcc 15 | full suite; no backtraces — see below |
+| Windows Server 2025 | MSVC 19.51 | suite + memory + stress + CLI regression, via CMake; no sanitizers |
 
 Anything C++17 and reasonably recent should work. gcc 12 through 16 and clang 14
 through 21 are the range actually exercised.
@@ -67,14 +67,29 @@ you to wonder:
 
 ### Windows
 
-The headers contain MSVC and Win32 code paths — `traits.h` detects the
-compiler, `platform.hpp` has `_aligned_malloc` and `dbghelp` branches — and
-**none of it has ever been compiled.** Treat Windows as a starting point rather
-than as supported. If you try it, a bug report is welcome and will be read as a
-finding, not a regression.
+Supported through **MSVC and CMake**. The suite builds warning-free at `/W4 /WX`
+and passes in CI on every commit (MSVC 19.51, Windows Server 2025).
 
-The reliable route on Windows today is **WSL**: install a distribution, then
-follow the Debian or Fedora row above.
+```powershell
+cmake -B build
+cmake --build build --config Debug
+ctest --test-dir build -C Debug --output-on-failure
+```
+
+Three things are missing there, and it is better to know before you rely on it:
+
+| | |
+|---|---|
+| **No sanitizers** | ASan/UBSan/TSan are run on Linux only. |
+| **No `make`** | The GNU Makefile and `ci/run.sh` are POSIX shell. CMake is the only build path. |
+| **Backtraces have no symbols** | `--mem.backtrace` gives addresses; nothing resolves them to names yet. Leak detection itself is unaffected. |
+
+The CLI regression (`tests/cli_test.sh`) is a shell script, so it runs through
+the bash that ships with Git for Windows. CMake finds it automatically and
+warns if it cannot.
+
+**MinGW-w64 has not been tried.** **WSL** works and follows the Debian or
+Fedora row above.
 
 ## Where the headers go
 

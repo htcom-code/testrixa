@@ -63,24 +63,54 @@ jobs:
       - name: ci/run.sh
         run: ci/run.sh
 
+  # Windows / MSVC.
+  #
+  # ci/run.sh cannot run here -- it is a POSIX shell script and half of what it
+  # does (make, the sanitizers, the shell-based consumer checks) has no Windows
+  # equivalent. So this job covers the part that does translate: configure,
+  # build and run the suite through CMake, which is the only build path a
+  # Windows consumer would use anyway.
+  #
+  # It passes now (MSVC 19.51 on Windows Server 2025), so it is a gate like any
+  # other -- no continue-on-error, and `ci-complete` waits on it below.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: toolchain
+        run: cmake --version
+      # No `cl --version` here: cl.exe is only on PATH inside a Developer
+      # Command Prompt, and this shell is not one. CMake's Visual Studio
+      # generator locates the compiler itself and prints which one it picked
+      # during configure, which is the information that step was after.
+      - name: configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: build
+        run: cmake --build build --config Debug
+      - name: test
+        run: ctest --test-dir build -C Debug --output-on-failure
+
   # One always-run job to mark as the required status check. It reports even
   # when `verify` is skipped, so the check never gets stuck, and it fails only
   # when a job actually failed or was cancelled -- `if: always()` on its own
   # would pass straight through an upstream failure. Keeping the required check
   # on this name means the jobs above can be restructured without touching
   # branch protection.
+  #
   ci-complete:
     if: always()
-    needs: [verify]
+    needs: [verify, windows]
     runs-on: ubuntu-latest
     steps:
       - name: gate on upstream results
         run: |
-          echo "verify=${{ needs.verify.result }}"
-          case "${{ needs.verify.result }}" in
-            failure|cancelled)
-              echo "a required job did not pass"
-              exit 1
-              ;;
-          esac
+          echo "verify=${{ needs.verify.result }} windows=${{ needs.windows.result }}"
+          for r in "${{ needs.verify.result }}" "${{ needs.windows.result }}"; do
+            case "$r" in
+              failure|cancelled)
+                echo "a required job did not pass"
+                exit 1
+                ;;
+            esac
+          done
           echo "all required jobs passed or were skipped"
