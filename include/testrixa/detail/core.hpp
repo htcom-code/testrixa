@@ -15,7 +15,7 @@
 #include <vector>
 #include <fstream>
 #include <list>
-#include <math.h>
+#include <cmath>
 #include <string>
 #include <type_traits>
 #include <iostream>
@@ -389,6 +389,11 @@ constexpr bool is_string_comp_v =
 
         MemoryTally m_memory;
     public:
+        // The root and scratch groups have no depth. Passing -1 to an unsigned
+        // parameter said that by accident and made MSVC /W4 rightly complain;
+        // naming the value says it on purpose.
+        static const unsigned DEPTH_NONE = (unsigned)-1;
+
         GroupInfo(const std::string &name, unsigned depth, TEST_STATUS_TYPE type=TST_NONE)
         :m_name(name), m_total(0), m_success(0), m_fail(0), m_measure(0), m_depth(depth), m_type(type) {}
         
@@ -638,7 +643,7 @@ constexpr bool is_string_comp_v =
             setinit();
             // ms µs ns
             if (nano > 0) {
-                m_hours   =  nano/(60UL*60UL*1000UL*1000UL*1000UL);
+                m_hours   =  (unsigned short)(nano/(60UL*60UL*1000UL*1000UL*1000UL));
                 m_minutes = (nano/(60UL*1000UL*1000UL*1000UL))%60UL;
                 m_seconds = (nano/(1000UL*1000UL*1000UL))%60UL;
                 m_millis  = (nano/(1000UL*1000UL))%1000UL;
@@ -650,7 +655,7 @@ constexpr bool is_string_comp_v =
         void setMicro(uint64_t micro) {
             setinit();
             if (micro > 0) {
-                m_hours   = micro/(60UL*60UL*1000UL*1000UL);
+                m_hours   = (unsigned short)(micro/(60UL*60UL*1000UL*1000UL));
                 m_minutes = (micro/(60UL*1000UL*1000UL))%60UL;
                 m_seconds = (micro/(1000UL*1000UL))%60UL;
                 m_millis  = (micro/1000UL)%1000UL;
@@ -661,7 +666,7 @@ constexpr bool is_string_comp_v =
         void setMill(uint64_t mill) {
             setinit();
             if (mill >0) {
-                m_hours   = mill/(60UL*60UL*1000UL);
+                m_hours   = (unsigned short)(mill/(60UL*60UL*1000UL));
                 m_minutes = (mill/(60UL*1000UL))%60UL;
                 m_seconds = (mill/1000UL)%60UL;
                 m_millis  = mill%1000UL;
@@ -671,7 +676,7 @@ constexpr bool is_string_comp_v =
         void setSecond(uint64_t sec) {
             setinit();
             if (sec >0) {
-                m_hours   = sec/(60UL*60UL);
+                m_hours   = (unsigned short)(sec/(60UL*60UL));
                 m_minutes = (sec/60UL)%60UL;
                 m_seconds = sec%60;
             }
@@ -874,7 +879,7 @@ constexpr bool is_string_comp_v =
         unsigned m_loop;
 
         TEST()
-        :m_status(TST_NONE), m_root("ROOT", -1), m_temp("", -1), m_next(nullptr), m_loop(TRX_DEFAULT_LOOP_COUNT) {
+        :m_status(TST_NONE), m_root("ROOT", GroupInfo::DEPTH_NONE), m_temp("", GroupInfo::DEPTH_NONE), m_next(nullptr), m_loop(TRX_DEFAULT_LOOP_COUNT) {
             m_next = list;
             list = this;
         }
@@ -1369,7 +1374,7 @@ constexpr bool is_string_comp_v =
             m_loop    = loop;
             int ret = 1;
 
-            if ( (TestCaseSelect.empty() == false && strcasecmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
+            if ( (TestCaseSelect.empty() == false && strCaseCmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
                 // basic test start.
                 if (run_baisc) {
                     m_status = TST_BASIC;
@@ -1507,7 +1512,7 @@ constexpr bool is_string_comp_v =
         }
 
         int run_check() {
-            if ( (TestCaseSelect.empty() == false && strcasecmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
+            if ( (TestCaseSelect.empty() == false && strCaseCmp(TestCaseSelect.c_str(), name()) == 0) || (TestCaseSelect.empty() == true) ) {
                 return 1;
             }
             return 0;
@@ -1773,7 +1778,7 @@ constexpr bool is_string_comp_v =
             uint64_t nano=m_nano;
             bool detail = TEST::testShowDetail();
 
-            if (m_nano >0) { nano = round((m_nano*1.0) / m_loop);}
+            if (m_nano >0) { nano = (uint64_t)std::llround((double)m_nano / m_loop); }
 
             TimeResults m_times;
             m_times.setNano(nano);
@@ -1812,15 +1817,19 @@ constexpr bool is_string_comp_v =
                 m_times.setNano(m_max);
                 ss << "|" << TRX_CYAN_BOLD_COLOR << m_times << TRX_RESET_COLOR;
             } else {
-                std::string fname(filename());
-                if (fname.length() > TRX_LOG_TIME_SOURCE) {
-                    fname = fname.substr(0, TRX_LOG_TIME_SOURCE - 3).append("...");
+                // Not `fname` again: that name already holds the description
+                // above, and MSVC /W4 rejects the shadowing (C4456). Two
+                // different things under one name in one function is worth
+                // renaming regardless of who complains.
+                std::string source(filename());
+                if (source.length() > TRX_LOG_TIME_SOURCE) {
+                    source = source.substr(0, TRX_LOG_TIME_SOURCE - 3).append("...");
                 }
                 
                 // file name
                 ss << std::setfill(' ');
                 ss << "|" << TRX_CYAN_BOLD_COLOR;
-                ss << std::setw(TRX_LOG_TIME_SOURCE) << fname << TRX_RESET_COLOR;
+                ss << std::setw(TRX_LOG_TIME_SOURCE) << source << TRX_RESET_COLOR;
                 
                 // line nomber
                 ss << "|" << TRX_CYAN_BOLD_COLOR;

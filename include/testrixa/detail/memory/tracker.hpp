@@ -460,8 +460,12 @@ private:
         header->frames      = 0;
 
         if ((m_config.checks & CheckBacktrace) && m_config.backtraceFrames > 0) {
-            const std::size_t bytes = (std::size_t)m_config.backtraceFrames * sizeof(void*);
-            header->backtrace = (void**)platform::rawAllocate(bytes);
+            // Not `bytes` -- that is this function's parameter, and holding
+            // two different sizes under one name is worth renaming even where
+            // the compiler stays quiet. MSVC /W4 does not (C4457).
+            const std::size_t frameBytes =
+                (std::size_t)m_config.backtraceFrames * sizeof(void*);
+            header->backtrace = (void**)platform::rawAllocate(frameBytes);
             if (header->backtrace) {
                 header->frames = platform::captureBacktrace(
                     header->backtrace, m_config.backtraceFrames, m_config.backtraceSkip);

@@ -9,6 +9,11 @@
 #define TESTRIXA_TRAITS_H
 
 #include <cstring>      // strrchr -- the __FILE_NAME__ fallback below uses it
+#if defined(_MSC_VER)
+#   include <string.h>   // _stricmp
+#else
+#   include <strings.h>  // strcasecmp -- POSIX puts it here, not in <cstring>
+#endif
 #include <string>
 
 //__has_include c++17 higher
@@ -171,10 +176,13 @@
 #   define TRX_OS_CYGWIN 1
 #elif defined(_WIN32)
 #   define TRX_OS_WINDOWS 1
-#   ifndef NOMINMAX
-#       define NOMINMAX
+    // <winapifamily.h>, not <windows.h>. All that is wanted here is the
+    // desktop/UWP split, and <windows.h> drags in rpcndr.h -- which typedefs
+    // `byte` at global scope and breaks any consumer who declared their own.
+    // checkNamespace.cpp caught exactly that on the first MSVC build.
+#   if __has_include(<winapifamily.h>)
+#       include <winapifamily.h>
 #   endif
-#   include <windows.h>
 #   if defined(WINAPI_FAMILY_PARTITION)
 #       if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
 #           define TRX_OS_WINDOWS_WIN32 1
@@ -236,6 +244,18 @@
 
 
 TRX_BEGIN_NAMESPACE
+
+// Case-insensitive comparison. POSIX spells it strcasecmp and declares it in
+// <strings.h>; MSVC spells it _stricmp and has never had the other. Both are C
+// library calls rather than locale-aware comparisons, which is what the
+// test-case name lookup wants.
+inline int strCaseCmp(const char* left, const char* right) {
+#if defined(_MSC_VER)
+    return ::_stricmp(left, right);
+#else
+    return ::strcasecmp(left, right);
+#endif
+}
 
 template <typename T> std::string type_name() {
     using TR = typename std::remove_reference<T>::type;
