@@ -54,6 +54,15 @@ against a baseline at every one.
   our tests and examples into a consumer's build.
 - **`TESTRIXA_NO_SHORT_MACROS`** to keep only the `TRX_`-prefixed macro names.
 
+### Added
+
+- **Windows / MSVC support.** The suite builds warning-free at `/W4 /WX` and
+  passes in CI (MSVC 19.51, Windows Server 2025) through CMake. Sanitizers,
+  `make` and backtrace symbolisation remain Linux/macOS only.
+- The memory and stress phases are registered with CTest. They are opt-in, so
+  `ctest` had been running neither — the memory suite was covered on Linux by
+  `make check` and nowhere on Windows, and the stress phase ran in no CI at all.
+
 ### Fixed
 
 Defects found and fixed during the conversion and the work that followed. Listed

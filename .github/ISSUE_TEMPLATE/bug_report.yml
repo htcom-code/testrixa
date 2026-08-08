@@ -82,7 +82,7 @@ body:
     id: platform
     attributes:
       label: OS and architecture
-      description: Windows is untested — MSVC and Win32 code paths exist in the headers and have never been compiled. Reports are welcome, but expect them to be findings rather than regressions.
+      description: Windows is supported through MSVC and CMake, but without sanitizers, without `make`, and with backtraces that show addresses rather than symbols. MinGW-w64 is untried.
       placeholder: "Debian 12 x86_64 / macOS 15 arm64 / Windows 11 MSVC 19.4"
     validations:
       required: true

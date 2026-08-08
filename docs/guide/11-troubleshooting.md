@@ -243,11 +243,23 @@ add `rm -rf *.dSYM` to your `clean` target and `*.dSYM/` to `.gitignore`.
 musl ships no `<execinfo.h>`. Everything else works; the leak report says so
 explicitly rather than leaving you to guess.
 
-### Windows
+### Windows: no sanitizer, no `make`
 
-Untested. MSVC and Win32 code paths exist in the headers and have never been
-compiled. Use WSL for now. Reports are welcome and will be read as findings, not
-regressions.
+Both are real limits rather than bugs. `ci/run.sh` and the GNU Makefile are
+POSIX shell scripts; **CMake is the only build path on Windows**, and the
+sanitizers are run on Linux only. The suite itself builds and passes under MSVC.
+
+### Windows: `--mem.backtrace` prints addresses, not names
+
+Expected. `CaptureStackBackTrace` collects the frames but nothing resolves them
+to symbols yet. Leak detection is unaffected — only the origin lines are raw
+addresses.
+
+### Windows: `ctest` skips the CLI regression
+
+`cli_test.sh` is a shell script and runs through the bash that Git for Windows
+installs. If CMake warned that it found no bash, install Git for Windows or run
+it by hand: `bash tests/cli_test.sh <path-to-runner>`.
 
 ### `ctest` runs no memory tests
 

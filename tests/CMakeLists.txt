@@ -23,6 +23,18 @@ target_compile_options(testrixa_tests PRIVATE ${TESTRIXA_WARNINGS})
 
 add_test(NAME testrixa_self_test COMMAND testrixa_tests)
 
+# The memory and stress phases are opt-in, so a plain run does not touch them.
+# ctest saw only the first line above until now, which meant the memory suite --
+# global operator new replacement, aligned allocation, backtrace capture, the
+# most platform-sensitive code here -- was never exercised through CMake at all.
+# On Linux `make check` covered it; on Windows, where CMake is the only build
+# path, nothing did.
+#
+# The stress phase had it worse: no CI on any platform ran it. A phase that
+# never runs is indistinguishable from one that does not exist.
+add_test(NAME testrixa_memory COMMAND testrixa_tests --mem)
+add_test(NAME testrixa_stress COMMAND testrixa_tests --stress --stress.scale=10)
+
 # Pins the terminal runner's command line. The prototype's parser shipped with
 # no tests, so this is the only thing the option registry can be checked against.
 #

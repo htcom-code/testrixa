@@ -71,14 +71,10 @@ jobs:
   # build and run the suite through CMake, which is the only build path a
   # Windows consumer would use anyway.
   #
-  # `continue-on-error` while the support is being established: the headers
-  # carry MSVC code paths that had never been compiled, so this job is expected
-  # to fail until they are made to work. It must not block `ci-complete` in the
-  # meantime -- but it must still run and be visible, which is the whole point.
-  # Remove the flag once it passes; leaving it is how a job becomes decoration.
+  # It passes now (MSVC 19.51 on Windows Server 2025), so it is a gate like any
+  # other -- no continue-on-error, and `ci-complete` waits on it below.
   windows:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
       - name: toolchain
@@ -101,20 +97,20 @@ jobs:
   # on this name means the jobs above can be restructured without touching
   # branch protection.
   #
-  # `windows` is deliberately absent from `needs` while it is establishing
-  # itself. Adding it is the last step of the Windows work, not the first.
   ci-complete:
     if: always()
-    needs: [verify]
+    needs: [verify, windows]
     runs-on: ubuntu-latest
     steps:
       - name: gate on upstream results
         run: |
-          echo "verify=${{ needs.verify.result }}"
-          case "${{ needs.verify.result }}" in
-            failure|cancelled)
-              echo "a required job did not pass"
-              exit 1
-              ;;
-          esac
+          echo "verify=${{ needs.verify.result }} windows=${{ needs.windows.result }}"
+          for r in "${{ needs.verify.result }}" "${{ needs.windows.result }}"; do
+            case "$r" in
+              failure|cancelled)
+                echo "a required job did not pass"
+                exit 1
+                ;;
+            esac
+          done
           echo "all required jobs passed or were skipped"
