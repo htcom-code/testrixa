@@ -226,25 +226,31 @@ constexpr bool is_string_comp_v =
 
         template<typename ...Args>
         TestString& appendFormat(const std::string &fmt, Args ... args) {
-            int size_s = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
-            if (size_s > 0) {
-                auto size = static_cast<size_t>( size_s );
-                std::unique_ptr<char[]> buf( new char[ size ] );
-                std::snprintf( buf.get(), size, fmt.c_str(), args ... );
-                m_chars.append(std::string( buf.get(), buf.get() + size - 1 ));
+            const int measured = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
+            if (measured > 0) {
+                const std::size_t needed = static_cast<std::size_t>( measured );
+                std::unique_ptr<char[]> buf( new char[ needed ] );
+                std::snprintf( buf.get(), needed, fmt.c_str(), args ... );
+                m_chars.append(std::string( buf.get(), buf.get() + needed - 1 ));
             }
             return *this;
         }
         
+        // The local is `needed`, not `size`. A consumer is entitled to a global
+        // named `size` -- checkNamespace.cpp declares one for exactly that
+        // reason -- and MSVC /W4 reports a local that hides it (C4459). Under
+        // /WX that is their build broken by our header, so public headers here
+        // avoid names a consumer plausibly has at namespace scope. The contract
+        // check is what tells us when a new one appears.
         template<typename ...Args>
         TestString& format(const std::string &fmt, Args ... args) {
-            int size_s = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
-            if (size_s > 0) {
-                auto size = static_cast<size_t>( size_s );
-                std::unique_ptr<char[]> buf( new char[ size ] );
-                std::snprintf( buf.get(), size, fmt.c_str(), args ... );
+            const int measured = std::snprintf( nullptr, 0, fmt.c_str(), args ... ) + 1;
+            if (measured > 0) {
+                const std::size_t needed = static_cast<std::size_t>( measured );
+                std::unique_ptr<char[]> buf( new char[ needed ] );
+                std::snprintf( buf.get(), needed, fmt.c_str(), args ... );
                 m_chars.clear();
-                m_chars.append(std::string( buf.get(), buf.get() + size - 1 ));
+                m_chars.append(std::string( buf.get(), buf.get() + needed - 1 ));
             }
             return *this;
         }
@@ -2233,12 +2239,12 @@ inline void ArgumentError(const std::string& message) {
 // Turns "basic,measure" into a mask. Returns false on an unknown name.
 inline bool ParsePhases(const std::string& text, unsigned& mask, std::string& unknown) {
     mask = 0;
-    std::string::size_type begin = 0;
-    while (begin <= text.size()) {
-        const std::string::size_type comma = text.find(',', begin);
+    std::string::size_type from = 0;
+    while (from <= text.size()) {
+        const std::string::size_type comma = text.find(',', from);
         const std::string name = (comma == std::string::npos)
-                               ? text.substr(begin)
-                               : text.substr(begin, comma - begin);
+                               ? text.substr(from)
+                               : text.substr(from, comma - from);
         if (name == "basic")        mask |= PHASE_BASIC;
         else if (name == "measure") mask |= PHASE_MEASURE;
         else if (name == "memory")  mask |= PHASE_MEMORY;
@@ -2246,7 +2252,7 @@ inline bool ParsePhases(const std::string& text, unsigned& mask, std::string& un
         else if (!name.empty())   { unknown = name; return false; }
 
         if (comma == std::string::npos) break;
-        begin = comma + 1;
+        from = comma + 1;
     }
     return true;
 }
@@ -2261,7 +2267,7 @@ void Listup(std::string &pname) {
 int main(int argc, char* argv[]) {
     bool stop = true;
     bool help = false;
-    bool list = false;
+    bool wantList = false;
     bool b_basic_only = false;
     bool b_time_only = false;
     unsigned phases = PHASE_DEFAULT;
@@ -2310,7 +2316,7 @@ int main(int argc, char* argv[]) {
         }
         if (arg == "--mem")                    { phases = PHASE_MEMORY; continue; }
         if (arg == "--stress")                 { phases = PHASE_STRESS; continue; }
-        if (arg == "-l" || arg == "--list")    { list = true;  continue; }
+        if (arg == "-l" || arg == "--list")    { wantList = true;  continue; }
         if (arg == "-h" || arg == "--help")    { help = true;  continue; }
         if (arg == "-s" || arg == "--no_stop") { stop = false; continue; }
         if (arg == "-d" || arg == "--detail")  { TEST::setTestShowDetail(true); continue; }
@@ -2366,9 +2372,9 @@ int main(int argc, char* argv[]) {
             }
 
             if (isLoopOption) {
-                char* end = nullptr;
-                const long parsed = std::strtol(digits.c_str(), &end, 10);
-                if (digits.empty() || (end && *end != '\0')) {
+                char* stop = nullptr;
+                const long parsed = std::strtol(digits.c_str(), &stop, 10);
+                if (digits.empty() || (stop && *stop != '\0')) {
                     ArgumentError(arg + ": expected an integer, e.g. -t=30");
                     return 1;
                 }
@@ -2393,7 +2399,7 @@ int main(int argc, char* argv[]) {
         command = arg;
     }
 
-    if (list) {
+    if (wantList) {
         Listup(pname);
         return 0;
     }

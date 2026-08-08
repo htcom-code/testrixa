@@ -179,9 +179,9 @@ public:
         }
 
         // reject trailing junk -- "30x" must not silently become 30
-        char* end = nullptr;
-        const long parsed = std::strtol(value.c_str(), &end, 10);
-        if (end == value.c_str() || (end && *end != '\0')) {
+        char* stop = nullptr;
+        const long parsed = std::strtol(value.c_str(), &stop, 10);
+        if (stop == value.c_str() || (stop && *stop != '\0')) {
             err = "expected an integer, got '" + value + "'";
             return false;
         }
@@ -233,15 +233,15 @@ public:
 private:
     bool permitted(const std::string& candidate) const {
         const std::string all(m_allowed);
-        std::string::size_type begin = 0;
-        while (begin <= all.size()) {
-            const std::string::size_type bar = all.find('|', begin);
+        std::string::size_type from = 0;
+        while (from <= all.size()) {
+            const std::string::size_type bar = all.find('|', from);
             const std::string piece = (bar == std::string::npos)
-                                    ? all.substr(begin)
-                                    : all.substr(begin, bar - begin);
+                                    ? all.substr(from)
+                                    : all.substr(from, bar - from);
             if (piece == candidate) return true;
             if (bar == std::string::npos) break;
-            begin = bar + 1;
+            from = bar + 1;
         }
         return false;
     }
