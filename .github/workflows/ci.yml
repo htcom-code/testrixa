@@ -82,10 +82,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: toolchain
-        run: |
-          cmake --version
-          cl 2>&1 | Select-Object -First 1
-        shell: pwsh
+        run: cmake --version
+      # No `cl --version` here: cl.exe is only on PATH inside a Developer
+      # Command Prompt, and this shell is not one. CMake's Visual Studio
+      # generator locates the compiler itself and prints which one it picked
+      # during configure, which is the information that step was after.
       - name: configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
       - name: build
