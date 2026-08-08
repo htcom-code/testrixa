@@ -63,12 +63,45 @@ jobs:
       - name: ci/run.sh
         run: ci/run.sh
 
+  # Windows / MSVC.
+  #
+  # ci/run.sh cannot run here -- it is a POSIX shell script and half of what it
+  # does (make, the sanitizers, the shell-based consumer checks) has no Windows
+  # equivalent. So this job covers the part that does translate: configure,
+  # build and run the suite through CMake, which is the only build path a
+  # Windows consumer would use anyway.
+  #
+  # `continue-on-error` while the support is being established: the headers
+  # carry MSVC code paths that had never been compiled, so this job is expected
+  # to fail until they are made to work. It must not block `ci-complete` in the
+  # meantime -- but it must still run and be visible, which is the whole point.
+  # Remove the flag once it passes; leaving it is how a job becomes decoration.
+  windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - name: toolchain
+        run: |
+          cmake --version
+          cl 2>&1 | Select-Object -First 1
+        shell: pwsh
+      - name: configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: build
+        run: cmake --build build --config Debug
+      - name: test
+        run: ctest --test-dir build -C Debug --output-on-failure
+
   # One always-run job to mark as the required status check. It reports even
   # when `verify` is skipped, so the check never gets stuck, and it fails only
   # when a job actually failed or was cancelled -- `if: always()` on its own
   # would pass straight through an upstream failure. Keeping the required check
   # on this name means the jobs above can be restructured without touching
   # branch protection.
+  #
+  # `windows` is deliberately absent from `needs` while it is establishing
+  # itself. Adding it is the last step of the Windows work, not the first.
   ci-complete:
     if: always()
     needs: [verify]

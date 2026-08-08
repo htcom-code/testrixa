@@ -24,8 +24,39 @@
 #include <cstdio>
 
 #if defined(_MSC_VER)
+    // <windows.h> is a public-header include, so it has to be tamed before it
+    // reaches a consumer:
+    //
+    //   NOMINMAX             it defines min/max as macros, which break
+    //                        std::min/std::max and anything with a member of
+    //                        that name -- in the consumer's code, not ours.
+    //   WIN32_LEAN_AND_MEAN  drops Winsock, OLE, RPC and the rest. We need
+    //                        dbghelp's dependencies and nothing else.
+    //
+    // Both are defined only if the consumer has not already made their own
+    // choice, and neither is left defined afterwards -- undefining a macro the
+    // consumer set would be the same class of pollution.
+#   ifndef NOMINMAX
+#       define NOMINMAX
+#       define TRX_DEFINED_NOMINMAX
+#   endif
+#   ifndef WIN32_LEAN_AND_MEAN
+#       define WIN32_LEAN_AND_MEAN
+#       define TRX_DEFINED_LEAN_AND_MEAN
+#   endif
 #   include <windows.h>
 #   include <dbghelp.h>
+#   ifdef TRX_DEFINED_NOMINMAX
+#       undef NOMINMAX
+#       undef TRX_DEFINED_NOMINMAX
+#   endif
+#   ifdef TRX_DEFINED_LEAN_AND_MEAN
+#       undef WIN32_LEAN_AND_MEAN
+#       undef TRX_DEFINED_LEAN_AND_MEAN
+#   endif
+    // dbghelp is not linked by default. Consumers using CMake get it from the
+    // interface target; this pragma covers everyone else.
+#   pragma comment(lib, "dbghelp.lib")
 #elif defined(__has_include)
 #   if __has_include(<execinfo.h>)
 #       include <execinfo.h>

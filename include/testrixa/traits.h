@@ -8,6 +8,7 @@
 #ifndef TESTRIXA_TRAITS_H
 #define TESTRIXA_TRAITS_H
 
+#include <cstring>      // strrchr -- the __FILE_NAME__ fallback below uses it
 #include <string>
 
 //__has_include c++17 higher
@@ -111,11 +112,26 @@
      __FILE__           : full path filename
      __LINE__           : line number
 */
+//
+// gcc and clang provide __FILE_NAME__ as a built-in, so the fallback below is
+// dead code there -- and was therefore never compiled until Windows was tried.
+// It needs <cstring> for strrchr, which this header now includes.
+//
+// MSVC paths can carry either separator: a path written into the project file
+// with '/' survives into __FILE__ even though the platform separator is '\'.
+// Checking only one of them leaves the full path in the report, so the MSVC
+// branch takes whichever appears last.
+//
 #if !defined(__FILE_NAME__)
 #   if defined(_MSC_VER)
-#       define __FILE_NAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+#       define TRX_FILE_NAME_SEP_(p) \
+            (std::strrchr(p, '\\') > std::strrchr(p, '/') \
+                ? std::strrchr(p, '\\') : std::strrchr(p, '/'))
+#       define __FILE_NAME__ \
+            (TRX_FILE_NAME_SEP_(__FILE__) ? TRX_FILE_NAME_SEP_(__FILE__) + 1 : __FILE__)
 #   else
-#       define __FILE_NAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#       define __FILE_NAME__ \
+            (std::strrchr(__FILE__, '/') ? std::strrchr(__FILE__, '/') + 1 : __FILE__)
 #   endif
 #endif
 

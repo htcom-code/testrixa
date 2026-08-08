@@ -27,6 +27,14 @@ target_include_directories(testrixa INTERFACE
 
 target_compile_features(testrixa INTERFACE cxx_std_17)
 
+# Leak backtraces come from dbghelp on Windows and from <execinfo.h> elsewhere.
+# platform.hpp carries a `#pragma comment(lib, "dbghelp.lib")`, which MSVC
+# honours but clang-cl and MinGW do not, so the dependency is declared here too.
+# Naming it twice is harmless; leaving it to the pragma alone is not.
+if(WIN32)
+    target_link_libraries(testrixa INTERFACE dbghelp)
+endif()
+
 # ---------------------------------------------------------------------------
 # Options
 #
