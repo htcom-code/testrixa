@@ -27,6 +27,11 @@ target_include_directories(testrixa INTERFACE
 
 target_compile_features(testrixa INTERFACE cxx_std_17)
 
+# testrixa_add_coverage(). Included here so add_subdirectory() and FetchContent
+# consumers get it too -- find_package() consumers get it from the generated
+# package config, which includes the same file.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/testrixaCoverage.cmake)
+
 # ---------------------------------------------------------------------------
 # Options
 #
@@ -89,4 +94,5 @@ write_basic_package_version_file(
 install(FILES
         ${CMAKE_CURRENT_BINARY_DIR}/testrixaConfig.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/testrixaConfigVersion.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/testrixaCoverage.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/testrixa)

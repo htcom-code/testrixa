@@ -24,25 +24,47 @@ testrixa was scoped as ten components plus two later ones. The ten are done.
 ### ✅ Shipped
 
 Unit test · Benchmark · Memory check · Leak detection · Stress · Thread harness
-· Mock · Fixture · Reporter · Runner.
+· Mock · Fixture · Reporter · Runner — the ten the project was scoped around —
+plus Coverage integration.
 
-### 🛠 Planned — Coverage
+### ✅ Shipped — Coverage
 
-Line and branch coverage, reported next to the test results rather than as a
-separate artifact a person has to go and find. The likely shape is a thin
-reader over `gcov`/`llvm-cov` output rather than instrumentation of our own —
-the compilers already do the hard part, and a home-grown instrumenter would be a
-worse version of theirs.
+`testrixa_add_coverage(target)` instruments a test target and reports through
+gcovr. See [docs/guide/12-coverage.md](docs/guide/12-coverage.md).
 
-Open question: whether coverage belongs in the console table at all, or only in
-the machine-readable report. A number that is always on screen tends to become a
-target.
+Nothing here measures coverage — the compiler does. What it adds is that the
+number is about **your** code. testrixa is header-only, so its headers compile
+into your binary and the instrumentation counts them; vendored or fetched, that
+reaches your report. Measured on a 14-line example whose own coverage is 100%,
+an unfiltered run reported **36% over 973 lines**. The exclusion is applied
+regardless of how testrixa was brought in, because which layout you picked is
+not something you should have to think about at report time.
 
-### 🛠 Planned — Profiler
+Two decisions worth stating:
 
-Beyond the measure phase's wall-clock timing: where the time went, not just how
-much there was. Same principle as coverage — lean on `perf`, `Instruments` and
-friends rather than sampling ourselves.
+- **The number is not printed in the console table.** A figure that is always
+  on screen tends to become a target, and a suite tuned to raise a percentage
+  is not the same as a suite that checks more.
+- **There is no coverage gate macro.** Coverage counts lines the tests
+  *reached*, not lines they *checked* — a run that executes everything and
+  asserts nothing scores 100%. Making that a pass condition would reward the
+  wrong thing.
+
+MSVC is not covered: gcov has no MSVC equivalent. OpenCppCoverage is the usual
+answer there and is a separate tool.
+
+### 🔎 Candidate — Per-test-case coverage attribution
+
+"Which lines did *this* test case cover, and did it cover anything the others
+did not." **This is the one coverage question only testrixa can answer** — the
+runner is the only thing that knows where a test case begins and ends — and it
+finds tests that add nothing.
+
+Not built yet because the cost is real and nobody has asked. It needs
+`__gcov_reset`/`__gcov_dump` on gcc and `__llvm_profile_reset_counters` on
+clang — different APIs, absent on MSVC — plus a dump per test case, which is
+not cheap. Same reason as Runner pattern selection below: it will be built when
+something needs it.
 
 ### 🔎 Candidate — Allocation histogram
 
@@ -117,6 +139,24 @@ worth it; recorded because the fallbacks in the source suggest otherwise.
 ---
 
 ## Deliberately not planned
+
+### 🚫 A profiler
+
+The measure phase already answers "how long did this take", and it times a
+callable in isolation so the figure is about your code. "Where did the time go
+inside it" is a sampling profiler's question, and `perf`, Instruments and VTune
+answer it well.
+
+The difference from coverage is worth spelling out, because both started as the
+same kind of plan. Coverage had something for testrixa to do: our headers were
+corrupting the consumer's number, so there was a thin layer that only we could
+write correctly. A profile has no equivalent — nothing we do distorts it in a
+way only we can undo, so a wrapper would add a step and no information.
+
+[docs/guide/12-coverage.md](docs/guide/12-coverage.md) shows how to use the
+measure phase and an external profiler together, including the two flags that
+make the profile readable (`-t=1000` to let the code under test dominate the
+samples, and a single test-case name to keep the report narrow).
 
 ### 🚫 A race detector
 

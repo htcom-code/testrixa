@@ -379,7 +379,14 @@ The honest list, and the reason in each case.
   frees, overflow into its own redzones and writes to quarantined memory. It
   does not see stack overflows, uninitialised reads, or undefined behaviour.
   Run both.
-- **Coverage and profiling are not here yet.** Planned, not written.
+- **Coverage is integrated, not implemented.** `testrixa_add_coverage()` wires
+  up gcov/gcovr and keeps the number about your code rather than testrixa's
+  headers — see [the guide](docs/guide/12-coverage.md). It is not printed in the
+  console table, and there is no coverage gate: coverage counts lines the tests
+  reached, not lines they checked.
+- **There is no profiler.** The measure phase says how long something took;
+  where the time went inside it is `perf`/Instruments' question, and nothing
+  testrixa does distorts a profile in a way only testrixa could undo.
 - **Mocks cover virtual interfaces and function-pointer seams.** Free functions
   with no seam need linker substitution, and non-virtual member functions need
   code generation; neither is in scope. Call-ordering expectations are not

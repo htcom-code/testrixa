@@ -56,6 +56,12 @@ against a baseline at every one.
 
 ### Added
 
+- **Coverage integration.** `testrixa_add_coverage(target)` instruments a test
+  target and reports through gcovr with testrixa's own headers excluded. Being
+  header-only means those headers compile into the consumer's binary and the
+  instrumentation counts them: measured on a 14-line example whose own coverage
+  is 100%, an unfiltered vendored run reported 36% over 973 lines. No console
+  number and no coverage gate, both deliberately — see `ROADMAP.md`.
 - **Windows / MSVC support.** The suite builds warning-free at `/W4 /WX` and
   passes in CI (MSVC 19.51, Windows Server 2025) through CMake. Sanitizers,
   `make` and backtrace symbolisation remain Linux/macOS only.
