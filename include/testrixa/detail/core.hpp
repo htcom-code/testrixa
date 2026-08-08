@@ -327,7 +327,17 @@ constexpr bool is_string_comp_v =
     // C++17 and cmp_equal arrived in C++20.
     template <typename A, typename B>
     constexpr bool equalValues(A a, B b) {
-        if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
+        // bool against an integer promotes to 0/1 before comparing. That is
+        // what `==` already does; MSVC /W4 asks for it in writing (C4805).
+        // Semantics are unchanged -- true == 2 stays false -- and routing it
+        // back through this function lets the signedness rules below apply.
+        if constexpr (std::is_same_v<std::remove_cv_t<A>, bool>
+                      && !std::is_same_v<std::remove_cv_t<B>, bool>) {
+            return equalValues(static_cast<int>(a), b);
+        } else if constexpr (!std::is_same_v<std::remove_cv_t<A>, bool>
+                             && std::is_same_v<std::remove_cv_t<B>, bool>) {
+            return equalValues(a, static_cast<int>(b));
+        } else if constexpr (std::is_integral_v<A> && std::is_integral_v<B>
                       && std::is_signed_v<A> != std::is_signed_v<B>) {
             if constexpr (std::is_signed_v<A>) {
                 // a negative signed value can never equal an unsigned one
@@ -2372,9 +2382,12 @@ int main(int argc, char* argv[]) {
             }
 
             if (isLoopOption) {
-                char* stop = nullptr;
-                const long parsed = std::strtol(digits.c_str(), &stop, 10);
-                if (digits.empty() || (stop && *stop != '\0')) {
+                // `tail`, not `stop`: this function already has a `stop`
+                // holding the fail-stop flag, and MSVC /W4 reports the second
+                // one hiding the first (C4456).
+                char* tail = nullptr;
+                const long parsed = std::strtol(digits.c_str(), &tail, 10);
+                if (digits.empty() || (tail && *tail != '\0')) {
                     ArgumentError(arg + ": expected an integer, e.g. -t=30");
                     return 1;
                 }
