@@ -2,4 +2,7 @@
 
 include("${CMAKE_CURRENT_LIST_DIR}/testrixaTargets.cmake")
 
+# testrixa_add_coverage() -- see docs/guide/12-coverage.md
+include("${CMAKE_CURRENT_LIST_DIR}/testrixaCoverage.cmake")
+
 check_required_components(testrixa)

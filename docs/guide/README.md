@@ -36,6 +36,7 @@ written down, on the toolchains listed in
 | 09 | [Build Integration](09-build-integration.md) | make · CMake (`find_package`, `add_subdirectory`, `FetchContent`) · Meson · Bazel · rules that apply to all |
 | 10 | [CI Integration](10-ci-integration.md) | GitHub Actions · GitLab CI · Jenkins · JUnit reports · the mistakes that block merges |
 | 11 | [Troubleshooting](11-troubleshooting.md) | Build and link errors · "nothing runs" · checks that seem wrong · platform notes |
+| 12 | [Coverage and Profiling](12-coverage.md) | `testrixa_add_coverage` · why the filter matters · coverage in CI · using the measure phase with `perf`/Instruments |
 
 ## Where to look for what
 
@@ -52,6 +53,8 @@ written down, on the toolchains listed in
 | put it in my CMake project | [09](09-build-integration.md#cmake) |
 | get failures onto my pull requests | [10](10-ci-integration.md) |
 | understand an error message | [11](11-troubleshooting.md) |
+| find out what the tests never reached | [12](12-coverage.md) |
+| profile the code under test | [12](12-coverage.md#profiling) |
 
 ## Related
 
